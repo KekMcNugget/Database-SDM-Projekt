@@ -1,0 +1,19 @@
+{
+  "name": "database-sdm-projekt",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KekMcNugget/Database-SDM-Projekt.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/KekMcNugget/Database-SDM-Projekt/issues"
+  },
+  "homepage": "https://github.com/KekMcNugget/Database-SDM-Projekt#readme",
+  "description": ""
+}
