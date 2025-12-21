@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Input } from "@heroui/input";
 import { Select, SelectItem } from "@heroui/select";
 import { Card, CardBody } from "@heroui/card";
@@ -8,6 +8,7 @@ import { Button } from "@heroui/button";
 import { Chip } from "@heroui/chip";
 import { Table, TableHeader, TableColumn, TableBody, TableRow, TableCell } from "@heroui/table";
 import dynamic from "next/dynamic";
+import { fetchAllSpotsData } from "@/lib/marineApi";
 
 // Dynamischer Import der Map-Komponente (nur Client-Side)
 const MapComponent = dynamic(() => import("./MapComponent"), {
@@ -19,16 +20,12 @@ const MapComponent = dynamic(() => import("./MapComponent"), {
   ),
 });
 
-// Mock data für Kite Spots
-const mockSpots = [
+// Basis-Spots mit Koordinaten (API liefert Wetter-Daten)
+const baseSpots = [
   {
     id: 1,
     name: "Tarifa - Los Lances",
     region: "Spanien",
-    windrichtung: "Ost",
-    windgeschwindigkeit: 25,
-    temperatur: 22,
-    qualität: "gut",
     lat: 36.0108,
     lng: -5.6038,
     beschreibung: "Perfekter Spot für Anfänger und Fortgeschrittene",
@@ -37,10 +34,6 @@ const mockSpots = [
     id: 2,
     name: "Fehmarn - Gold",
     region: "Deutschland",
-    windrichtung: "West",
-    windgeschwindigkeit: 18,
-    temperatur: 15,
-    qualität: "mittel",
     lat: 54.4375,
     lng: 11.1867,
     beschreibung: "Beliebter Spot in der Ostsee",
@@ -49,10 +42,6 @@ const mockSpots = [
     id: 3,
     name: "Dakhla - Speed Spot",
     region: "Marokko",
-    windrichtung: "Nord",
-    windgeschwindigkeit: 30,
-    temperatur: 25,
-    qualität: "gut",
     lat: 23.7225,
     lng: -15.9430,
     beschreibung: "Weltklasse Flachwasser-Spot",
@@ -61,10 +50,6 @@ const mockSpots = [
     id: 4,
     name: "St. Peter-Ording",
     region: "Deutschland",
-    windrichtung: "West",
-    windgeschwindigkeit: 12,
-    temperatur: 14,
-    qualität: "schlecht",
     lat: 54.3167,
     lng: 8.6333,
     beschreibung: "Breiter Strand, gut bei starkem Wind",
@@ -73,10 +58,6 @@ const mockSpots = [
     id: 5,
     name: "Cabarete - Kite Beach",
     region: "Dominikanische Republik",
-    windrichtung: "Ost",
-    windgeschwindigkeit: 22,
-    temperatur: 28,
-    qualität: "gut",
     lat: 19.7500,
     lng: -70.4167,
     beschreibung: "Tropisches Kite-Paradies",
@@ -93,9 +74,24 @@ export default function OverviewPage() {
   const [mindestWind, setMindestWind] = useState("");
   const [maxTemperatur, setMaxTemperatur] = useState("");
   const [selectedSpots, setSelectedSpots] = useState<number[]>([]);
+  const [detailSpot, setDetailSpot] = useState<number | null>(null);
+  const [spots, setSpots] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [focusSpotId, setFocusSpotId] = useState<number | null>(null);
+
+  // Lade API-Daten beim Start
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      const data = await fetchAllSpotsData(baseSpots);
+      setSpots(data);
+      setLoading(false);
+    };
+    loadData();
+  }, []);
 
   // Filter Logik
-  const filteredSpots = mockSpots.filter((spot) => {
+  const filteredSpots = spots.filter((spot) => {
     const matchesSearch = spot.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesRegion = selectedRegion === "Alle" || spot.region === selectedRegion;
     const matchesWindrichtung = selectedWindrichtung === "Alle" || spot.windrichtung === selectedWindrichtung;
@@ -126,7 +122,18 @@ export default function OverviewPage() {
     );
   };
 
-  const selectedSpotsData = mockSpots.filter((spot) => selectedSpots.includes(spot.id));
+  const selectedSpotsData = spots.filter((spot) => selectedSpots.includes(spot.id));
+
+  if (loading) {
+    return (
+      <div className="min-h-screen p-6 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-2xl font-bold mb-4">Lade Kite Spot Daten...</div>
+          <div className="text-gray-600 dark:text-gray-400">Wetter- und Wellendaten werden abgerufen</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen p-6">
@@ -195,7 +202,10 @@ export default function OverviewPage() {
                     key={spot.id}
                     isPressable
                     isHoverable
-                    onPress={() => toggleSpotSelection(spot.id)}
+                    onPress={() => {
+                      setDetailSpot(spot.id);
+                      setFocusSpotId(spot.id);
+                    }}
                   >
                     <CardBody>
                       <div className="flex justify-between items-start">
@@ -230,12 +240,111 @@ export default function OverviewPage() {
               <h2 className="text-xl font-semibold mb-4">Karte</h2>
               <MapComponent
                 spots={filteredSpots}
-                onSpotClick={toggleSpotSelection}
+                onSpotClick={(id) => {
+                  setDetailSpot(id);
+                  setFocusSpotId(id);
+                }}
                 selectedSpots={selectedSpots}
+                focusSpotId={focusSpotId}
               />
             </CardBody>
           </Card>
         </div>
+
+        {/* Detail-Ansicht für ausgewählten Spot */}
+        {detailSpot !== null && (() => {
+          const spot = spots.find(s => s.id === detailSpot);
+          if (!spot) return null;
+          
+          return (
+            <Card className="mb-6">
+              <CardBody>
+                <div className="flex justify-between items-start mb-4">
+                  <h2 className="text-2xl font-bold">{spot.name}</h2>
+                  <Button
+                    size="sm"
+                    color="default"
+                    variant="flat"
+                    onPress={() => setDetailSpot(null)}
+                  >
+                    Schließen
+                  </Button>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <h3 className="text-lg font-semibold mb-3">Allgemeine Informationen</h3>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">Region:</span>
+                        <span className="font-medium">{spot.region}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">Windrichtung:</span>
+                        <span className="font-medium">{spot.windrichtung}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">Windgeschwindigkeit:</span>
+                        <span className="font-medium">{spot.windgeschwindigkeit} km/h</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">Temperatur:</span>
+                        <span className="font-medium">{spot.temperatur}°C</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">Wellenhöhe:</span>
+                        <span className="font-medium">{spot.wellenhöhe} m</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">Wellengeschwindigkeit:</span>
+                        <span className="font-medium">{spot.wellengeschwindigkeit} km/h</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">Qualität:</span>
+                        <Chip color={getQualityColor(spot.qualität)} size="sm">
+                          {spot.qualität}
+                        </Chip>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h3 className="text-lg font-semibold mb-3">Beschreibung</h3>
+                    <p className="text-gray-700 dark:text-gray-300">{spot.beschreibung}</p>
+                    
+                    <div className="mt-4">
+                      <h3 className="text-lg font-semibold mb-3">Koordinaten</h3>
+                      <div className="space-y-1">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600 dark:text-gray-400">Latitude:</span>
+                          <span className="font-mono text-sm">{spot.lat}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600 dark:text-gray-400">Longitude:</span>
+                          <span className="font-mono text-sm">{spot.lng}</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <Button
+                      className="mt-4 w-full"
+                      color="primary"
+                      onPress={() => {
+                        setSelectedSpots(prev => 
+                          prev.includes(spot.id) 
+                            ? prev.filter(id => id !== spot.id)
+                            : [...prev, spot.id]
+                        );
+                      }}
+                    >
+                      {selectedSpots.includes(spot.id) ? 'Aus Vergleich entfernen' : 'Zum Vergleich hinzufügen'}
+                    </Button>
+                  </div>
+                </div>
+              </CardBody>
+            </Card>
+          );
+        })()}
 
         {/* Bottom: Vergleichstabelle */}
         {selectedSpotsData.length > 0 && (
@@ -261,6 +370,8 @@ export default function OverviewPage() {
                   <TableColumn>WINDRICHTUNG</TableColumn>
                   <TableColumn>WIND (km/h)</TableColumn>
                   <TableColumn>TEMPERATUR</TableColumn>
+                  <TableColumn>WELLENHÖHE (m)</TableColumn>
+                  <TableColumn>WELLENGESCHW. (km/h)</TableColumn>
                   <TableColumn>QUALITÄT</TableColumn>
                   <TableColumn>BESCHREIBUNG</TableColumn>
                 </TableHeader>
@@ -272,6 +383,8 @@ export default function OverviewPage() {
                       <TableCell>{spot.windrichtung}</TableCell>
                       <TableCell>{spot.windgeschwindigkeit}</TableCell>
                       <TableCell>{spot.temperatur}°C</TableCell>
+                      <TableCell>{spot.wellenhöhe}</TableCell>
+                      <TableCell>{spot.wellengeschwindigkeit}</TableCell>
                       <TableCell>
                         <Chip color={getQualityColor(spot.qualität)} size="sm">
                           {spot.qualität}
