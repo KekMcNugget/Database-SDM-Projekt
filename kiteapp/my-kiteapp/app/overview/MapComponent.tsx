@@ -21,12 +21,13 @@ interface MapComponentProps {
   spots: Spot[];
   onSpotClick: (spotId: number) => void;
   selectedSpots: number[];
+  focusSpotId?: number | null;
 }
 
-export default function MapComponent({ spots, onSpotClick, selectedSpots }: MapComponentProps) {
+export default function MapComponent({ spots, onSpotClick, selectedSpots, focusSpotId }: MapComponentProps) {
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const markersRef = useRef<L.Marker[]>([]);
+  const markersRef = useRef<Map<number, L.Marker>>(new Map());
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
@@ -53,7 +54,7 @@ export default function MapComponent({ spots, onSpotClick, selectedSpots }: MapC
 
     // Alte Marker entfernen
     markersRef.current.forEach((marker) => marker.remove());
-    markersRef.current = [];
+    markersRef.current.clear();
 
     if (spots.length === 0) return;
 
@@ -142,7 +143,7 @@ export default function MapComponent({ spots, onSpotClick, selectedSpots }: MapC
           onSpotClick(spot.id);
         });
 
-      markersRef.current.push(marker);
+      markersRef.current.set(spot.id, marker);
     });
 
     // Map an Spots anpassen
@@ -151,6 +152,27 @@ export default function MapComponent({ spots, onSpotClick, selectedSpots }: MapC
       mapRef.current.fitBounds(bounds, { padding: [50, 50] });
     }
   }, [spots, onSpotClick]);
+
+  // Separater Effekt für Zoom zu ausgewähltem Spot
+  useEffect(() => {
+    if (!mapRef.current || focusSpotId === null || focusSpotId === undefined) return;
+
+    const spot = spots.find(s => s.id === focusSpotId);
+    const marker = markersRef.current.get(focusSpotId);
+    
+    if (spot && marker) {
+      // Zoom zur Position
+      mapRef.current.setView([spot.lat, spot.lng], 10, {
+        animate: true,
+        duration: 1
+      });
+      
+      // Öffne Popup nach kurzer Verzögerung
+      setTimeout(() => {
+        marker.openPopup();
+      }, 500);
+    }
+  }, [focusSpotId, spots]);
 
   return (
     <div className="h-[600px] rounded-lg overflow-hidden relative">
